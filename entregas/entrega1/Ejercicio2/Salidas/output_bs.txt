@@ -1,0 +1,20 @@
+Ejecucion N=1024 BS=2
+Tiempo requerido para la operacion: 61.837840
+Ejecucion N=1024 BS=4
+Tiempo requerido para la operacion: 48.907570
+Ejecucion N=1024 BS=8
+Tiempo requerido para la operacion: 43.396579
+Ejecucion N=1024 BS=16
+Tiempo requerido para la operacion: 41.725971
+Ejecucion N=1024 BS=32
+Tiempo requerido para la operacion: 39.857428
+Ejecucion N=1024 BS=64
+Tiempo requerido para la operacion: 39.340737
+Ejecucion N=1024 BS=128
+Tiempo requerido para la operacion: 38.886454
+Ejecucion N=1024 BS=256
+Tiempo requerido para la operacion: 38.590304
+Ejecucion N=1024 BS=512
+Tiempo requerido para la operacion: 38.460038
+Ejecucion N=1024 BS=1024
+Tiempo requerido para la operacion: 39.021395

@@ -1,0 +1,2 @@
+Soluciones Float: 2.00000	2.00000
+Soluciones Double: 2.00032	1.99968

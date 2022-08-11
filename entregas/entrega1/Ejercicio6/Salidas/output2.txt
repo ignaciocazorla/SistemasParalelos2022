@@ -1,0 +1,3 @@
+TIMES: 300
+Tiempo requerido solucion Double: 19.628656
+Tiempo requerido solucion Float: 17.913019
