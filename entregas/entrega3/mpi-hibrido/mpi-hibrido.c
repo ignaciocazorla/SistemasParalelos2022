@@ -56,34 +56,6 @@ void initializeResultados(unsigned long long * resultadosFib){
 	}
 }
 
-/*void matrizFibonacci(unsigned long long * resultadosFib, int * F, double ** FibonacciF, int n, int * minF, int * maxF, int * sumaF) {
-  int valor, i, j, max, min, suma;
-  double * FibF;
-  FibF = *FibonacciF;
-  max = *maxF;
-  min = *minF;
-  suma = *sumaF;
-  #pragma omp for private(i, j, valor) schedule(static) reduction(+:suma) reduction(max:max) reduction(min:min)
-  for(i=0;i<n;i++){
-    for(j=0;j<n;j++){ 
-      
-      valor = resultadosFib[F[i * n + j] - 1];
-
-      if(valor > max){
-        max = valor;
-      }
-      if(valor < min){
-        min = valor;
-      }
-
-      suma = suma + valor;
-
-      // Es necesario castear el int a double para que funcione
-      FibF[i+j * n] = (double) valor;
-  	}
-  }
-}*/
-
 void suma_parcial(double ** m1, double **m2, double **m3, int n, int stripSize, int escalar){
   double * matriz1 = (double *) * m1;
   double * matriz2 = (double *) * m2;
@@ -100,22 +72,17 @@ void suma_parcial(double ** m1, double **m2, double **m3, int n, int stripSize, 
 
 int main(int argc, char *argv[]){
   double *A,*B,*C,*D,*AporB, *ABC, *FibF, *DporF, *R;
-  int *F, min = 102334156, max = -1, suma = 0;
+  int *F, min = 102334156, max = -1, suma = 0, valor;
   int myrank, size, porcion;
   unsigned long long *resultadosFib;
   int i,j,n,bs,escalar = 0;
   double commTimes[6], commTime, totalTime;
-  int provided, numThreads;
+  int provided;
 
   // Validar argumentos al programa
-  if ( (argc != 4) || ((n = atoi(argv[1])) <= 0) || ((bs = atoi(argv[2])) <= 0) || ((n % bs) != 0) || ((numThreads = atoi(argv[3])) <= 0))
+  if ( (argc != 3) || ((n = atoi(argv[1])) <= 0) || ((bs = atoi(argv[2])) <= 0) || ((n % bs) != 0))
   {
-    printf("\nError en los parametros. Usage: ./%s N BS numThreads (N debe ser multiplo de BS)\n", argv[0]);
-    exit(1);
-  }
-
-  if((numThreads != 16) && (numThreads != 32) ){
-    printf("La cantidad de hilos debe ser 16 o 32!");
+    printf("\nError en los parametros. Usage: ./%s N BS (N debe ser multiplo de BS)\n", argv[0]);
     exit(1);
   }
 
@@ -129,11 +96,12 @@ int main(int argc, char *argv[]){
   // Calcular porcion de matriz que se reparte a cada proceso
   porcion = n / size;
 
+  // Utilizar bs mas chico en caso de que la porcion que se reparte sea menor que bs
   if(bs > porcion){
     bs = porcion;
   }
 
-  // Reservar memoria
+// Reservar memoria
   if (myrank == COORDINATOR)
   {
     A = (double *) malloc(n * n * sizeof(double));
@@ -141,6 +109,7 @@ int main(int argc, char *argv[]){
     AporB = (double *) malloc(n * n * sizeof(double));
     ABC = (double *) malloc(n * n * sizeof(double));
     DporF = (double *) malloc(n * n * sizeof(double));
+    F = (int *) malloc(sizeof(int)*n*n);
     R = (double *) malloc(n * n * sizeof(double));
   } else {
     A=(double*)malloc(sizeof(double)*n*porcion);
@@ -148,11 +117,11 @@ int main(int argc, char *argv[]){
     AporB=(double*)malloc(sizeof(double)*n*porcion);
     ABC=(double*)malloc(sizeof(double)*n*porcion);
     DporF=(double*)malloc(sizeof(double)*n*porcion);
+    F = (int *) malloc(sizeof(int)*n*porcion);
     R = (double*)malloc(sizeof(double)*n*porcion);
   }
    B = (double *) malloc(n * n * sizeof(double));
    C = (double *) malloc(n * n * sizeof(double));
-   F = (int *) malloc(n * n * sizeof(int));
    FibF=(double*)malloc(sizeof(double)*n*n);
    resultadosFib = (unsigned long long*)malloc(40 * sizeof(unsigned long long));
 
@@ -172,25 +141,21 @@ int main(int argc, char *argv[]){
 
   //Comunicaciones 1
   commTimes[0] = MPI_Wtime();
-  MPI_Bcast(F, n * n, MPI_INT, COORDINATOR, MPI_COMM_WORLD);
   MPI_Scatter(A, n * porcion, MPI_DOUBLE, A, n * porcion, MPI_DOUBLE, COORDINATOR, MPI_COMM_WORLD);
   MPI_Bcast(B, n * n, MPI_DOUBLE, COORDINATOR, MPI_COMM_WORLD);
   MPI_Bcast(C, n * n, MPI_DOUBLE, COORDINATOR, MPI_COMM_WORLD);
   MPI_Scatter(D, n * porcion, MPI_DOUBLE, D, n * porcion, MPI_DOUBLE, COORDINATOR, MPI_COMM_WORLD);
+  MPI_Scatter(F, n * porcion, MPI_INT, F, n * porcion, MPI_INT, COORDINATOR, MPI_COMM_WORLD);
   commTimes[1] = MPI_Wtime();
   //Fin comunicaciones 1
 
-  #pragma omp parallel num_threads(numThreads)
+  #pragma omp parallel num_threads(8)
   {
 
     initializeResultados(resultadosFib);
 
-    //matrizFibonacci(resultadosFib, F, &FibF, n, &min, &max, &suma);
-    int valor;
-
-    // Separar la matriz fibF para llenarla o llenarla toda junta?
     #pragma omp for private(i, j, valor) schedule(static) reduction(+:suma) reduction(max:max) reduction(min:min)
-    for(i=0;i<n;i++){
+    for(i=0;i<porcion;i++){
       for(j=0;j<n;j++){ 
       
         valor = resultadosFib[F[i * n + j] - 1];
@@ -205,36 +170,38 @@ int main(int argc, char *argv[]){
         suma = suma + valor;
 
         // Es necesario castear el int a double para que funcione
-        FibF[i+j * n] = (double) valor;
+        FibF[i * n+j] = (double) valor;
   	  }
     }
-
-    matmulblks(A,B,AporB,n,bs,porcion);
-    matmulblks(AporB,C,ABC,n,bs,porcion);
-    matmulblks(D,FibF,DporF,n,bs,porcion);
 
     //Comunicaciones 2
     commTimes[2] = MPI_Wtime();
     if(omp_get_thread_num() == COORDINATOR){
-      // NO son necesarios de la manera que estamos trabajando porque estamos llenando y recorriendo toda la matriz en cada proceso.
-      //MPI_Allreduce(&max, &max, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-      //MPI_Allreduce(&min, &min, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-      //MPI_Allreduce(&suma, &suma, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
+      MPI_Allgather(FibF, n * porcion, MPI_DOUBLE, FibF, n * porcion, MPI_DOUBLE, MPI_COMM_WORLD);
+      MPI_Allreduce(&max, &max, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+      MPI_Allreduce(&min, &min, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+      MPI_Allreduce(&suma, &suma, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
       escalar = (max * min) / (suma/(n*n));
     }
-    //commTimes[3] = MPI_Wtime();
+    commTimes[3] = MPI_Wtime();
     //Fin comunicaciones 2
 
-    //#pragma omp barrier
+    #pragma omp barrier
+
+    matmulblks(A,B,AporB,n,bs,porcion);
+    matmulblks(D,FibF,DporF,n,bs,porcion);
+    #pragma omp barrier
+    matmulblks(AporB,C,ABC,n,bs,porcion);
+
+    #pragma omp barrier
   
     suma_parcial(&ABC, &DporF, &R, n, porcion, escalar);
   }
 
   //Comunicaciones 3 
-    commTimes[4] = MPI_Wtime(); 
-    MPI_Gather(R, n * porcion, MPI_DOUBLE, R, n * porcion, MPI_DOUBLE, COORDINATOR, MPI_COMM_WORLD);
-    commTimes[5] = MPI_Wtime();
+  commTimes[4] = MPI_Wtime(); 
+  MPI_Gather(R, n * porcion, MPI_DOUBLE, R, n * porcion, MPI_DOUBLE, COORDINATOR, MPI_COMM_WORLD);
+  commTimes[5] = MPI_Wtime();
   //Fin comunicaciones 3
   
   MPI_Finalize();

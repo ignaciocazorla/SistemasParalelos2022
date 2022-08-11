@@ -1,1 +1,0 @@
-slurmstepd: error: *** JOB 56724 ON nodo2 CANCELLED AT 2022-04-02T18:38:58 ***

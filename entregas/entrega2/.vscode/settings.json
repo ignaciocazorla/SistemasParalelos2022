@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "limits": "c",
-        "time.h": "c",
-        "mmblk.h": "c",
-        "stdio.h": "c"
-    }
-}
